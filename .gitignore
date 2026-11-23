@@ -1,0 +1,13 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+
+# Build artifacts
+build/
+dist/
+
+# Router backups
+Yedekler/
+*.log
