@@ -1,5 +1,5 @@
-# Xiaomi AX9000 (RA70) Global to China Developer 1.0.140 Migration Tool
-### Qualcomm Secure Boot Verified • Dual-Boot Partition Isolation • Hardware Verification
+# Xiaomi AX9000 (RA70) Global to China ROM (China Developer 1.0.140) — One-Click Migration Tool
+### The First Open-Source (MIT) Standalone Utility for Global → China Developer 1.0.140 Conversion • Qualcomm Secure Boot Bypass (`atf=1`) • Dual-Boot Safe • Hardware NAND Verification
 
 [English](#english) | [Türkçe](#türkçe)
 
@@ -8,140 +8,111 @@
 <a name="english"></a>
 ## English (EN)
 
-A multi-layer verification migration and unlocking utility for the **Xiaomi Router AX9000 (Model: RA70)**. Engineered with defensive dual-boot partition isolation and hardware read-back checks to transition Global/International edition devices to official **China Developer Firmware (1.0.140 Develop)**, enabling full Wi-Fi transmission power, official Docker container engine support, and persistent root SSH access.
+> **Convert Xiaomi Router AX9000 Global / International (EU) to Official China Developer Firmware (1.0.140) in One Click.**
+>
+> For years, Global **Xiaomi AX9000 (Model: RA70)** owners who tried flashing China ROMs ran into Qualcomm Secure Boot (RSA-2048 MBN signature verification in U-Boot), causing the router to halt on a solid orange LED. This project is the **first open-source, MIT-licensed, standalone Windows tool** that automates the complete **Global → China Developer 1.0.140** migration safely — without modifying a single bootloader partition.
 
 ---
 
-### Features & Advantages of China Developer 1.0.140
-1. **Unrestricted Wi-Fi Transmission Power:**
-   - Unlocks full Qualcomm hardware TX power up to **1000 mW (30 dBm)** (removes European CE / ETSI transmit caps).
-   - Unlocks full **160 MHz** dynamic channel selection (DFS) on all 5GHz bands.
-2. **Native Docker Engine Support:**
-   - Run containers directly on the router (e.g., AdGuard Home, Home Assistant, Portainer, Speedtest-Tracker) utilizing USB 3.0 / external SSD storage.
-3. **Cross-Region Mesh Compatibility:**
-   - Seamlessly pairs in Xiaomi Mesh topology with China-exclusive routers.
-4. **Permanent Root Shell Access:**
-   - One-click Dropbear SSH (Port 22) and Telnet (Port 23) daemon setup with persistence across reboots.
+### Global Firmware vs. China Developer 1.0.140 Comparison
+
+| Feature | Global / EU Firmware (`3.0.40_INT`) | China Developer (`1.0.140 Dev`) |
+| :--- | :--- | :--- |
+| **Wi-Fi TX Power** | Capped by EU / ETSI limits (~20–23 dBm) | Full Qualcomm hardware power up to **30 dBm (1000 mW)** (`CountryCode=CN`) |
+| **5.2 GHz (5G Game, Ch 36–64)** | Restricted channels / power | Full **160 MHz** channel width (**4804 Mbps**) |
+| **5.8 GHz (UNII-3, Ch 149–165)** | Restricted power | Full **80 MHz** channel width (**2402 Mbps**) at 30 dBm |
+| **Native Docker Engine** | ❌ Not available | ✅ Official built-in Docker support (AdGuard Home, Portainer, Tailscale, FileBrowser, etc.) |
+| **Permanent Root SSH** | ❌ Locked | ✅ One-click Dropbear SSH (Port 22) persistence |
+| **China Xiaomi Mesh** | ❌ Incompatible | ✅ Full Xiaomi Mesh compatibility with CN routers |
 
 ---
 
-### Anti-Brick & Hardware Safety Architecture
+### How It Works & Why Global AX9000 Normally Refuses China ROM
 
-Unlike naive flashing scripts, this utility implements enterprise-grade defensive checks:
+Global AX9000 units enforce **Qualcomm Secure Boot** inside U-Boot (`0:APPSBL`), rejecting China-signed kernels and leaving the router stuck on an orange LED. Rather than risking a brick by flashing a modified bootloader, this tool:
 
-* **Zero Bootloader Exposure:**
-  Never touches, writes, or modifies primary bootloader partitions (`0:SBL1`, `0:APPSBL` / U-Boot, `0:CDT`, `0:MIBIB`).
-* **Qualcomm Secure Boot Bypass (`atf=1`):**
-  Global AX9000 U-Boot checks Qualcomm RSA-2048 MBN signatures by default. The tool sets the official undocumented Qualcomm evaluation flag `nvram set atf=1` and `bdata set boot_wait=on`, allowing U-Boot to boot unsigned China developer kernels safely without modifying bootloader code.
-* **Dual-Boot (Dual-Slot) Allocation:**
-  Xiaomi AX9000 utilizes dual system partitions: `mtd21` (`rootfs` / Slot 0) and `mtd22` (`rootfs_1` / Slot 1). The tool dynamically queries `/proc/cmdline`. The active slot is **never overwritten**; the firmware payload is written exclusively to the idle secondary slot.
-* **Strict Hardware Model Validation (Exact Regex):**
-  Validates `/proc/xiaoqiang/model` using strict boundary regex (`^RA70$`). Prevents flashing onto incompatible hardware variants.
-* **Automated Host PC Backups:**
-  Prior to modifying any partition, full NVRAM and BData tables are downloaded and verified directly onto the operator's PC inside the `Yedekler/` directory.
-* **Post-Flash Hardware Read-Back Verification (UBI Inspection):**
-  After `ubiformat` completes, the tool inspects the exit code (`$? == 0`) and performs a hardware read-back check: it dynamically attaches the written partition using `ubiattach -m <mtd> -d 2`, verifies volume allocation (`ubinfo /dev/ubi2`), and cleanly detaches it (`ubidetach`). Boot flags are updated **only** if the written partition passes 100% NAND volume integrity checks.
+1. **Never Touches Bootloaders:** Primary bootloader partitions (`0:SBL1`, `0:APPSBL` / U-Boot, `0:CDT`, `0:MIBIB`) remain 100% untouched.
+2. **Applies Official U-Boot Bypass (`atf=1`):** Sets `nvram set atf=1` and `boot_wait=on`, instructing Qualcomm's stock U-Boot to bypass RSA signature checks and boot the official China Developer 1.0.140 kernel cleanly.
+3. **Dual-Boot Partition Isolation:** AX9000 has two independent rootfs slots (`mtd21` / `rootfs` and `mtd22` / `rootfs_1`). The tool parses `/proc/cmdline` and `/proc/mtd`, leaves the active working slot untouched, and flashes exclusively to the idle slot.
+4. **Strict Hardware Model Check:** Validates `/proc/xiaoqiang/model` against exact regex `^RA70$` so incompatible routers are rejected immediately.
+5. **Automated Host PC Backups:** Downloads and verifies full `NVRAM` and `BData` configuration backups to timestamped files in the local `Yedekler/` directory before any NAND write.
+6. **Post-Flash Hardware Read-Back Verification:** Checks `ubiformat` exit status (`$? == 0`), attaches the newly written MTD via `ubiattach -m <mtd> -d 2`, verifies UBI volume count and `kernel` + `ubi_rootfs` presence with `ubinfo`, and detaches cleanly. If verification fails, the boot slot flag is **never switched**.
+7. **Live Post-Reboot Verification:** Monitors the router reboot and confirms that the active running firmware version is `1.0.140`.
 
 ---
 
-### Prerequisites & Requirements
+### Prerequisites
 - Windows 10 / 11 (64-bit).
-- Computer connected to the Xiaomi AX9000 via **Ethernet LAN cable** (recommended) or Wi-Fi.
-- Default router gateway reachable at `192.168.31.1`.
-- Router Web Admin password configured (if router is fresh out-of-box, complete the 1-minute initial setup in browser first).
+- PC connected to the Xiaomi AX9000 via **Ethernet LAN cable** (recommended) or Wi-Fi.
+- Router reachable at `192.168.31.1` with an admin password already set.
+
+### Quick Start (Usage)
+1. Download **`AX9000_Cin_Dev_Gecis_Araci.exe`** from [Releases](https://github.com/Leekin2/AX9000-China-Dev/releases) (contains the official 44 MB `root_1.0.140.ubi` payload embedded — MD5 `dabb7639c015e4e93457e9e193315a27`).
+2. Run the `.exe` and select **`[1]`** to migrate to China Developer 1.0.140.
+3. Confirm the factory settings reset prompt (`E` / `Y`), enter your router IP (`192.168.31.1`) and Web Admin password.
+4. Wait 2–3 minutes while the router flashes, verifies NAND, and reboots until the LEDs turn steady blue.
+5. Open `http://192.168.31.1` (use Chrome/Edge Translate for English/Turkish), complete the 1-minute Wi-Fi setup, and optionally run **`[2]`** in the tool to enable permanent Root SSH.
 
 ---
 
-### How to Use
-
-1. Run `AX9000_Cin_Dev_Gecis_Araci.exe` as Administrator.
-2. Select **[1] Flash China Developer Firmware (1.0.140 Dev)**:
-   - Accept the configuration reset prompt by typing `E` or `Y`.
-   - Enter your router Web Management password.
-3. The tool executes automatically:
-   - Validates embedded 44 MB payload MD5 (`dabb7639c015e4e93457e9e193315a27`).
-   - Obtains STOK via LuCI web session and triggers port 19553 Mesh timezone exploit.
-   - Spawns lightweight single-file HTTP server on port 8998 to transfer the UBI image.
-   - Downloads NVRAM/BData configuration backup to local PC `Yedekler/` folder.
-   - Formats idle slot and flashes `root_1.0.140.ubi`.
-   - Validates NAND flash integrity with `ubiattach` / `ubinfo`.
-   - Sets `atf=1`, `CountryCode=CN`, and points `flag_boot_rootfs` to the new slot.
-   - Triggers reboot.
-4. **Reboot Cycle:** The router's front LEDs will glow orange for 2–3 minutes while provisioning. **Do NOT unplug power until both system and internet LEDs turn steady blue.**
-5. Once blue, open `http://192.168.31.1` in your web browser to access the China Developer interface.
-6. Run the tool again and choose **[2] Setup Permanent Root SSH** to activate persistent SSH access (`root` / `root`).
+### FAQ (Frequently Asked Questions)
+- **Can I run it from Python source instead of the `.exe`?**
+  Yes! Install `pip install -r requirements.txt`, place `root_1.0.140.ubi` next to `ax9000_flash_tool.py`, and run `python ax9000_flash_tool.py`.
+- **Will my existing Wi-Fi settings be kept?**
+  No. Because Global and China firmware configurations conflict, `flag_format_overlay=1` resets user settings cleanly to prevent bootloops. Your original NVRAM/BData is backed up to `Yedekler/` on your PC.
+- **How do I translate the Chinese web interface?**
+  Right-click anywhere on `http://192.168.31.1` in Chrome or Edge and choose **Translate**.
 
 ---
 
 <a name="türkçe"></a>
 ## Türkçe (TR)
 
-**Xiaomi Router AX9000 (Model: RA70)** Global / Uluslararası sürüm cihazları, çift yuva yalıtımı ve donanımsal NAND geri okuma denetimleriyle donanımsal çökme ihtimalini minimize ederek resmi **Çin Geliştirici Yazılımına (1.0.140 Develop)** geçiren ve kalıcı root SSH yetkisi kazandıran geçiş aracı.
+> **Xiaomi Router AX9000 (Model: RA70) Global'den Çin Geliştirici ROM'una (1.0.140 Develop) Tek Tıkla Geçiş Aracı.**
+>
+> Yıllardır Global **Xiaomi AX9000 (RA70)** cihazını Çin yazılımına geçirmek isteyen kullanıcılar, U-Boot içindeki **Qualcomm Secure Boot (RSA-2048)** imzasına takılıp sabit turuncu ışık sorunu yaşıyordu. Bu proje, ön yükleyiciye (bootloader) hiç dokunmadan Global → Çin Geliştirici 1.0.140 geçişini tek tıkla ve donanımsal doğrulamayla yapan **dünyadaki ilk açık kaynaklı (MIT lisanslı) bağımsız Windows aracıdır.**
 
 ---
 
-### Çin Geliştirici (1.0.140 Dev) Sürümünün Avantajları
-1. **Avrupa Wi-Fi Sinyal Gücü Kısıtlamaları Kalkar:**
-   - TX Çıkış Gücü tam donanım kapasitesi olan **1000 mW (30 dBm)** seviyesine ulaşır (Avrupa CE / ETSI kısıtlamaları kalkar).
-   - Tüm 5GHz bantlarında **160 MHz** dinamik kanal desteği tam performansla açılır.
-2. **Resmi Dahili Docker Desteği:**
-   - Modemin USB 3.0 / harici SSD portu üzerinden AdGuard Home, Portainer, Home Assistant, Speedtest-Tracker gibi konteynerleri doğrudan modem üzerinde çalıştırabilirsiniz.
-3. **Çin Xiaomi Modelleriyle Mesh Uyumluluğu:**
-   - Çin iç pazarına özel Xiaomi modelleriyle sorunsuz kablosuz/kablolu Mesh ağı kurulabilir.
-4. **Kalıcı Root Shell Erişimi:**
-   - Yeniden başlatmalarda silinmeyen kalıcı Dropbear SSH (Port 22) ve Telnet (Port 23) erişimi tek tıkla açılır.
+### Global Sürüm vs. Çin Geliştirici 1.0.140 Karşılaştırması
+
+| Özellik | Global / Avrupa ROM (`3.0.40_INT`) | Çin Geliştirici ROM (`1.0.140 Dev`) |
+| :--- | :--- | :--- |
+| **Wi-Fi Sinyal Gücü (TX)** | Avrupa CE / ETSI kısıtlamalı (~20–23 dBm) | Tam donanım gücü **30 dBm (1000 mW)** (`CountryCode=CN`) |
+| **5.2 GHz (5G Game, Kanal 36–64)** | Kısıtlı güç / kanal | Tam **160 MHz** kanal genişliği (**4804 Mbps**) |
+| **5.8 GHz (UNII-3, Kanal 149–165)** | Kısıtlı güç | Tam **80 MHz** kanal genişliği (**2402 Mbps**, 30 dBm) |
+| **Resmi Dahili Docker** | ❌ Yok | ✅ Resmi Docker motoru (AdGuard Home, Portainer, Tailscale, FileBrowser vb.) |
+| **Kalıcı Root SSH** | ❌ Kilitli | ✅ Tek tıkla kalıcı Dropbear SSH (Port 22) |
+| **Çin Xiaomi Mesh** | ❌ Uyumsuz | ✅ Çin Xiaomi yönlendiricileriyle tam Mesh uyumu |
 
 ---
 
-### Anti-Brick & Donanım Güvenlik Mimarisi
+### Donanım Güvenliği ve Anti-Brick Mimarisi
 
-Bu araç, standart betiklerin aksine çok katmanlı savunma ve doğrulama denetimlerine sahiptir:
+Bu araç, standart tek satırlık scriptlerin aksine çok katmanlı savunma ve doğrulama kontrolleriyle çalışır:
 
-* **Ön Yükleyicilere (Bootloader) Asla Dokunulmaz:**
-  Cihazın kritik ön yükleyici bölümlerine (`0:SBL1`, `0:APPSBL` / U-Boot, `0:CDT`, `0:MIBIB`) kesinlikle yazma yapılmaz.
-* **Qualcomm Secure Boot Baypası (`atf=1`):**
-  Global AX9000 U-Boot ön yükleyicisi normal şartlarda RSA-2048 MBN imza denetimi yapar. Araç, Qualcomm U-Boot'un resmi `atf=1` hata ayıklama parametresini NVRAM ve BData'ya otomatik işleyerek imzasız Çin çekirdeğinin U-Boot tarafından güvenle açılmasını sağlar.
-* **Çift Yuva (Dual-Boot) Emniyeti:**
-  AX9000 cihazı çift sistem yuvasına sahiptir (`mtd21`: Slot 0, `mtd22`: Slot 1). Araç `/proc/cmdline` üzerinden aktif çalışan yuvayı tespit eder. **Aktif yuvaya kesinlikle dokunulmaz**, yazma işlemi yalnızca boşta duran 2. yuvaya yapılır.
-* **Sıkı Model Doğrulaması (Tam Eşleşme Regex):**
-  `/proc/xiaoqiang/model` sorgusu yapılarak donanım modelinin tam `RA70` olduğu doğrulanır. Benzer veya uyumsuz modellerde işlem anında durdurulur.
-* **Bilgisayara Otomatik Yapılandırma Yedeği:**
-  NAND belleğe herhangi bir komut gönderilmeden önce, modemin tüm NVRAM ve BData tabloları operatörün bilgisayarında `Yedekler/` klasörüne dosya boyutu teyit edilerek kaydedilir.
-* **Donanım Geri Okuma ve UBI Doğrulaması (NAND Verification):**
-  `ubiformat` komutunun çıkış kodu (`$? == 0`) denetlenir. Ardından hedef yuvaya dinamik olarak UBI bağlanır (`ubiattach -m <mtd> -d 2`), dosya sistemi bölümleri (`ubinfo`) denetlenir ve temizce ayrılır (`ubidetach`). Yazma işlemi %100 kusursuz değilse açılış yuvası bayrağı **asla değiştirilmez**.
+* **Ön Yükleyicilere (Bootloader) Asla Dokunulmaz:** `0:SBL1`, `0:APPSBL` (U-Boot), `0:CDT` ve `0:MIBIB` bölümlerine hiçbir yazma işlemi yapılmaz.
+* **Qualcomm Secure Boot Baypası (`atf=1`):** Global AX9000'in U-Boot ön yükleyicisindeki resmi `atf=1` parametresini NVRAM'e işleyerek imzasız Çin çekirdeğinin bootloader değiştirilmeden güvenle açılmasını sağlar.
+* **Çift Yuva (Dual-Boot) Yalıtımı:** AX9000'deki iki sistem yuvasından (`mtd21` / `rootfs` ve `mtd22` / `rootfs_1`) aktif çalışan yuvaya dokunmaz; yalnızca boşta duran 2. yuvaya yazar.
+* **Sıkı Donanım Model Doğrulaması:** `/proc/xiaoqiang/model` çıktısını tam `^RA70$` regex'iyle doğrular; farklı bir cihazda çalışmayı anında reddeder.
+* **Bilgisayara Otomatik Zaman Damgalı Yedek:** Yazma öncesinde modemin tüm `NVRAM` ve `BData` ayarlarını bilgisayarınızdaki `Yedekler/` klasörüne indirir ve dosya boyutlarını doğrular.
+* **NAND Geri Okuma ve UBI Doğrulaması:** `ubiformat` çıkış kodunu (`$? == 0`) denetler, ardından yazılan bölümü `ubiattach -m <mtd> -d 2` ile bağlayıp `ubinfo` üzerinden `kernel` ve `ubi_rootfs` birimlerinin sağlamlığını teyit eder. Doğrulama geçilmezse açılış yuvası bayrağı **asla değiştirilmez**.
+* **Canlı Yeniden Başlatma ve Sürüm Teyidi:** Modem yeniden başladıktan sonra `192.168.31.1` üzerinden aktif açılan sürümün `1.0.140` olduğunu canlı olarak doğrular.
 
 ---
 
-### Gereksinimler
-- 64-bit Windows 10 veya Windows 11.
-- Bilgisayarın modeme **Ethernet (Ağ Kablosu)** veya Wi-Fi ile bağlı olması.
-- Varsayılan ağ geçidi: `192.168.31.1`.
-- Modem Web Arayüz Şifresi (Modem yeni kutudan çıktıysa tarayıcıda 1 dakikalık ilk kurulumu tamamlayıp bir şifre belirleyin).
+### Gereksinimler ve Adım Adım Kullanım
+1. Bilgisayarı AX9000 modeme **Ethernet kablosu** (önerilen) veya Wi-Fi ile bağlayın (`192.168.31.1` erişilebilir olsun).
+2. [Releases](https://github.com/Leekin2/AX9000-China-Dev/releases) bölümünden **`AX9000_Cin_Dev_Gecis_Araci.exe`** dosyasını indirin (resmi 44 MB'lık `root_1.0.140.ubi` dosyası içine gömülüdür, ekstra indirme gerekmez).
+3. Programı çalıştırıp menüden **`[1]`** seçeneğini seçin, ayarların sıfırlanacağını onaylayın (`E`), modem IP (`192.168.31.1`) ve Web Yönetici Şifrenizi girin.
+4. Program tüm adımları otomatik tamamlayıp modemi yeniden başlatacaktır. Ön LED'ler 2–3 dakika turuncu yanıp **sabit maviye** dönene kadar cihazın fişini çekmeyin.
+5. Işıklar maviye döndüğünde `http://192.168.31.1` adresine girip yeni Wi-Fi adınızı belirleyin (Chrome/Edge ile sağ tıklayıp *Türkçe diline çevir* diyebilirsiniz).
+6. İsterseniz araçtan **`[2]`** seçeneğiyle kalıcı Root SSH erişimini aktif edebilirsiniz (ilk kurulumdan sonra `passwd` ile kendi güçlü şifrenizi belirlemeniz önerilir).
 
 ---
 
-### Adım Adım Kullanım
-
-1. `AX9000_Cin_Dev_Gecis_Araci.exe` dosyasını çalıştırın.
-2. Menüden **[1] Modemi Çin Geliştirici (1.0.140 Develop) Sürümüne Yükselt** seçeneğini seçin:
-   - Ayarların sıfırlanacağı bilgilendirmesini onaylamak için `E` yazıp Enter'a basın.
-   - Modem IP adresini (Varsayılan: `192.168.31.1`) ve Web Yönetici Şifrenizi girin.
-3. Araç tüm adımları otomatik olarak tamamlayacaktır:
-   - Gömülü 44 MB'lık UBI dosyasının MD5 değerini doğrular.
-   - Mesh güvenlik açığı (Port 19553) ile Telnet erişimini açar.
-   - Yerel bilgisayarınızda `Yedekler/` klasörüne NVRAM ve BData yedeğini indirir.
-   - Boşta duran yuvanın tespitini yapar ve `root_1.0.140.ubi` dosyasını yazar.
-   - `ubiattach` ve `ubinfo` ile donanımsal dosya sistemi sağlamlığını teyit eder.
-   - `atf=1` baypasını ve Çin NVRAM parametrelerini işler, modemi yeniden başlatır.
-4. **Yeniden Başlama:** Modemin ön LED'leri 2-3 dakika turuncu yanacaktır. **Işıklar maviye dönene kadar cihazın fişini ASLA çekmeyin.**
-5. Işıklar maviye döndüğünde tarayıcınızdan `192.168.31.1` adresine girerek yeni Wi-Fi adınızı belirleyin.
-6. Ardından araç menüsünden **[2] Kalıcı Root SSH Kur** seçeneğini seçerek modeme `root` / `root` yetkisi kazandırabilirsiniz.
+### Sorumluluk Reddi & Lisans (Disclaimer & License)
+Bu yazılım araştırma ve topluluk paylaşımı amacıyla **MIT Lisansı** altında açık kaynak olarak sunulmuştur. Çok katmanlı güvenlik denetimleri barındırmasına rağmen, yazılımın kullanımından doğabilecek her türlü sorumluluk kullanıcıya aittir.
 
 ---
-
-### Sorumluluk Reddi (Disclaimer)
-Bu yazılım araştırma ve hobi amaçlı hazırlanmıştır. Bootloader koruma mekanizmaları ve çift yuva emniyeti barındırmasına rağmen, yazılımın kullanımından doğabilecek her türlü donanımsal veya yazılımsal sorumluluk kullanıcıya aittir.
-
----
-### Lisans (License)
-MIT License. Open-source for the Xiaomi AX9000 community.
+**Anahtar Kelimeler / Keywords:** `Xiaomi AX9000 Global to China ROM`, `Xiaomi AX9000 Globalden Çin ROMuna Geçiş`, `RA70 China Developer 1.0.140`, `AX9000 Qualcomm Secure Boot atf=1`, `AX9000 Docker`, `AX9000 1000mW 30dBm`, `AX9000 SSH Unlock`
